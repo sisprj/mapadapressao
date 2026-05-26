@@ -1,0 +1,251 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { HeartPulse, Plus, Trash2, Smile, Meh, Frown, Activity } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+const HUMORES = [
+  { id: "bem", label: "Bem", icon: Smile },
+  { id: "neutro", label: "Neutro", icon: Meh },
+  { id: "mal", label: "Mal", icon: Frown },
+];
+
+function classificarPressao(sistolica, diastolica) {
+  if (!sistolica || !diastolica) return "Sem dados";
+  if (sistolica >= 180 || diastolica >= 120) return "Crise hipertensiva";
+  if (sistolica >= 140 || diastolica >= 90) return "Pressão elevada";
+  if (sistolica < 90 || diastolica < 60) return "Pressão baixa";
+  return "Faixa usual";
+}
+
+export default function AppPressaoArterial() {
+  const [registros, setRegistros] = useState([]);
+  const [form, setForm] = useState({
+    sistolica: "",
+    diastolica: "",
+    bpm: "",
+    horario: new Date().toISOString().slice(0, 16),
+    humor: "neutro",
+    observacao: "",
+  });
+
+  useEffect(() => {
+    const salvos = localStorage.getItem("registrosPressao");
+    if (salvos) setRegistros(JSON.parse(salvos));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("registrosPressao", JSON.stringify(registros));
+  }, [registros]);
+
+  const medias = useMemo(() => {
+    if (!registros.length) return { sistolica: 0, diastolica: 0, bpm: 0 };
+    const soma = registros.reduce(
+      (acc, r) => ({
+        sistolica: acc.sistolica + Number(r.sistolica),
+        diastolica: acc.diastolica + Number(r.diastolica),
+        bpm: acc.bpm + Number(r.bpm),
+      }),
+      { sistolica: 0, diastolica: 0, bpm: 0 }
+    );
+    return {
+      sistolica: Math.round(soma.sistolica / registros.length),
+      diastolica: Math.round(soma.diastolica / registros.length),
+      bpm: Math.round(soma.bpm / registros.length),
+    };
+  }, [registros]);
+
+  const ultimoRegistro = registros[0];
+
+  function atualizarCampo(campo, valor) {
+    setForm((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  function salvarRegistro(e) {
+    e.preventDefault();
+
+    const novoRegistro = {
+      id: crypto.randomUUID(),
+      ...form,
+      sistolica: Number(form.sistolica),
+      diastolica: Number(form.diastolica),
+      bpm: Number(form.bpm),
+    };
+
+    setRegistros((atuais) => [novoRegistro, ...atuais]);
+    setForm({
+      sistolica: "",
+      diastolica: "",
+      bpm: "",
+      horario: new Date().toISOString().slice(0, 16),
+      humor: "neutro",
+      observacao: "",
+    });
+  }
+
+  function excluirRegistro(id) {
+    setRegistros((atuais) => atuais.filter((r) => r.id !== id));
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-900">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <motion.header
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-3xl bg-white p-6 shadow-sm border"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-red-100 p-3">
+              <HeartPulse className="h-7 w-7 text-red-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">Diário de Pressão Arterial</h1>
+              <p className="text-slate-600">Registre pressão sistólica, diastólica, BPM, horário e humor.</p>
+            </div>
+          </div>
+        </motion.header>
+
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="rounded-3xl shadow-sm">
+            <CardContent className="p-5">
+              <p className="text-sm text-slate-500">Média sistólica</p>
+              <p className="text-3xl font-bold">{medias.sistolica || "—"}</p>
+              <p className="text-sm text-slate-500">mmHg</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-3xl shadow-sm">
+            <CardContent className="p-5">
+              <p className="text-sm text-slate-500">Média diastólica</p>
+              <p className="text-3xl font-bold">{medias.diastolica || "—"}</p>
+              <p className="text-sm text-slate-500">mmHg</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-3xl shadow-sm">
+            <CardContent className="p-5">
+              <p className="text-sm text-slate-500">Média BPM</p>
+              <p className="text-3xl font-bold">{medias.bpm || "—"}</p>
+              <p className="text-sm text-slate-500">batimentos/min</p>
+            </CardContent>
+          </Card>
+        </section>
+
+        {ultimoRegistro && (
+          <Card className="rounded-3xl shadow-sm border-l-8 border-l-red-500">
+            <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <p className="text-sm text-slate-500">Último registro</p>
+                <p className="text-xl font-semibold">
+                  {ultimoRegistro.sistolica}/{ultimoRegistro.diastolica} mmHg · {ultimoRegistro.bpm} bpm
+                </p>
+                <p className="text-slate-600">{new Date(ultimoRegistro.horario).toLocaleString("pt-BR")}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-100 px-4 py-2 font-medium">
+                {classificarPressao(ultimoRegistro.sistolica, ultimoRegistro.diastolica)}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <Card className="lg:col-span-2 rounded-3xl shadow-sm">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-bold mb-4">Novo registro</h2>
+              <form onSubmit={salvarRegistro} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1">
+                    <span className="text-sm text-slate-600">Sistólica</span>
+                    <input required type="number" min="50" max="250" value={form.sistolica} onChange={(e) => atualizarCampo("sistolica", e.target.value)} className="w-full rounded-2xl border p-3" placeholder="120" />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-sm text-slate-600">Diastólica</span>
+                    <input required type="number" min="30" max="160" value={form.diastolica} onChange={(e) => atualizarCampo("diastolica", e.target.value)} className="w-full rounded-2xl border p-3" placeholder="80" />
+                  </label>
+                </div>
+
+                <label className="space-y-1 block">
+                  <span className="text-sm text-slate-600">BPM</span>
+                  <input required type="number" min="30" max="220" value={form.bpm} onChange={(e) => atualizarCampo("bpm", e.target.value)} className="w-full rounded-2xl border p-3" placeholder="75" />
+                </label>
+
+                <label className="space-y-1 block">
+                  <span className="text-sm text-slate-600">Horário</span>
+                  <input required type="datetime-local" value={form.horario} onChange={(e) => atualizarCampo("horario", e.target.value)} className="w-full rounded-2xl border p-3" />
+                </label>
+
+                <div>
+                  <span className="text-sm text-slate-600">Humor</span>
+                  <div className="grid grid-cols-3 gap-2 mt-1">
+                    {HUMORES.map((h) => {
+                      const Icone = h.icon;
+                      const ativo = form.humor === h.id;
+                      return (
+                        <button
+                          key={h.id}
+                          type="button"
+                          onClick={() => atualizarCampo("humor", h.id)}
+                          className={`rounded-2xl border p-3 flex flex-col items-center gap-1 ${ativo ? "bg-slate-900 text-white" : "bg-white"}`}
+                        >
+                          <Icone className="h-5 w-5" />
+                          <span className="text-sm">{h.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <label className="space-y-1 block">
+                  <span className="text-sm text-slate-600">Observação</span>
+                  <textarea value={form.observacao} onChange={(e) => atualizarCampo("observacao", e.target.value)} className="w-full rounded-2xl border p-3 min-h-20" placeholder="Ex.: dor de cabeça, café, exercício, estresse..." />
+                </label>
+
+                <Button className="w-full rounded-2xl p-6 text-base" type="submit">
+                  <Plus className="mr-2 h-5 w-5" /> Salvar registro
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-3 rounded-3xl shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Histórico</h2>
+                <div className="text-sm text-slate-500">{registros.length} registro(s)</div>
+              </div>
+
+              {!registros.length ? (
+                <div className="rounded-3xl border border-dashed p-8 text-center text-slate-500">
+                  <Activity className="mx-auto mb-2 h-8 w-8" />
+                  Nenhum registro salvo ainda.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {registros.map((r) => {
+                    const humor = HUMORES.find((h) => h.id === r.humor);
+                    const IconeHumor = humor?.icon || Meh;
+                    return (
+                      <div key={r.id} className="rounded-3xl border bg-white p-4 flex items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <p className="font-bold text-lg">{r.sistolica}/{r.diastolica} mmHg · {r.bpm} bpm</p>
+                          <p className="text-sm text-slate-600">{new Date(r.horario).toLocaleString("pt-BR")}</p>
+                          <p className="text-sm font-medium">{classificarPressao(r.sistolica, r.diastolica)}</p>
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <IconeHumor className="h-4 w-4" /> {humor?.label}
+                          </div>
+                          {r.observacao && <p className="text-sm text-slate-600">{r.observacao}</p>}
+                        </div>
+                        <button onClick={() => excluirRegistro(r.id)} className="rounded-2xl p-2 hover:bg-slate-100" aria-label="Excluir registro">
+                          <Trash2 className="h-5 w-5 text-slate-500" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+    </main>
+  );
+}
